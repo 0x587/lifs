@@ -26,15 +26,13 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
-add_executable(test_storage test/test_storage.cpp)
-target_link_libraries(test_storage GTest::gtest_main lifs)
-
-add_executable(test_dictionary test/test_dictionary.cpp)
-target_link_libraries(test_dictionary GTest::gtest_main lifs)
-
-add_executable(test_arbiter test/test_arbiter.cpp)
-target_link_libraries(test_arbiter GTest::gtest_main lifs)
+add_executable(
+        test_liblifs
+        test/test_storage.cpp
+        test/test_dictionary.cpp
+        test/test_arbiter.cpp)
+target_link_libraries(test_liblifs GTest::gtest_main lifs)
 
 include(GoogleTest)
-gtest_discover_tests(test_storage test_dictionary)
+gtest_discover_tests(test_liblifs)
 
