@@ -55,11 +55,9 @@ namespace lifs::arbiter {
 
     private:
         std::unordered_map<std::string, dictionary::Dictionary *> nodes;
-        std::unordered_map<std::string, INode> sendBuffer;
+        std::unordered_map<std::string, INode> inodes;
 
         dictionary::Dictionary *existInNode(const std::string &path);
-
-        bool existInBuffer(const std::string &path);
     };
 
 } // lifs

@@ -13,8 +13,9 @@ namespace lifs::arbiter {
     }
 
     void Arbiter::sendTo(const std::string &path, const std::string &nodeName) {
-        if (!existInBuffer(path)) { return; }
-        auto &buf = sendBuffer[path];
+        if (!exist(path)) { return; }
+
+        auto &buf = inodes[path];
         if (std::find(buf.nodeNames.begin(), buf.nodeNames.end(), nodeName) == buf.nodeNames.end()) {
             buf.nodeNames.push_back(nodeName);
             buf.dirty = true;
@@ -32,90 +33,82 @@ namespace lifs::arbiter {
         return nullptr;
     }
 
-    bool Arbiter::existInBuffer(const std::string &path) {
-        return sendBuffer.find(path) != sendBuffer.end();
-    }
-
     bool Arbiter::exist(const std::string &path) {
-        if (existInNode(path) != nullptr) { return true; }
-        return existInBuffer(path);
+        return inodes.find(path) != inodes.end();
     }
 
     std::vector<NodeInfo> Arbiter::devStatus(const std::string &path) {
         std::vector<NodeInfo> res;
-        if (existInBuffer(path)) {
-            for (const auto &name: sendBuffer[path].nodeNames) {
-                res.push_back(NodeInfo{name});
-            }
+
+        if (!exist(path)) { return res; }
+
+        for (const auto &name: inodes[path].nodeNames) {
+            res.push_back(NodeInfo{name});
         }
         return res;
     }
 
     bool Arbiter::create(const std::string &path) {
         if (exist(path)) { return false; }
-        sendBuffer[path] = INode();
+
+        inodes[path] = INode();
         return true;
     }
 
     int Arbiter::read(const std::string &path, std::vector<uint8_t> &buf, int offset, int size) {
-        dictionary::Dictionary *d = existInNode(path);
-        if (d != nullptr) {
-            auto fs = d->open(path, std::ios::in);
-            fs->seekp(offset);
-            buf.resize(size);
-            int readLen = (int) fs->readsome((char *) buf.data(), size);
-            d->close(fs);
-            return readLen;
-        }
-        if (existInBuffer(path)) {
-            int len = (int) sendBuffer[path].buffer.size();
+        if (!exist(path)) { return 0; }
+
+        if (isDirty(path)) {
+            int len = (int) inodes[path].buffer.size();
             if (offset + size > len) {
                 size = len - offset;
             }
             buf.resize(size);
-            std::copy(sendBuffer[path].buffer.begin(), sendBuffer[path].buffer.begin() + size, buf.begin());
-            sendBuffer[path].dirty = true;
+            std::copy(inodes[path].buffer.begin(), inodes[path].buffer.begin() + size, buf.begin());
             return size;
         }
-        return 0;
+
+        auto inode = inodes[path];
+        // TODO: Checking the correctness of multiple copies
+        auto dict = nodes[inode.nodeNames.front()];
+        auto fs = dict->open(path, std::ios::in);
+        fs->seekp(offset);
+        buf.resize(size);
+        int readLen = (int) fs->readsome((char *) buf.data(), size);
+        dict->close(fs);
+        return readLen;
     }
 
     int Arbiter::write(const std::string &path, const std::vector<uint8_t> &buf, int offset) {
-        dictionary::Dictionary *d = existInNode(path);
-        if (d != nullptr) {
-            auto fs = d->open(path, std::ios::out);
-            fs->seekp(offset);
-            fs->write((char *) buf.data(), (int) buf.size());
-            d->close(fs);
-            return (int) buf.size();
+        if (!exist(path)) { return 0; }
+
+        if (inodes[path].buffer.size() < offset + buf.size()) {
+            inodes[path].buffer.resize(offset + buf.size());
         }
-        if (existInBuffer(path)) {
-            if (sendBuffer[path].buffer.size() < offset + buf.size()) {
-                sendBuffer[path].buffer.resize(offset + buf.size());
-            }
-            std::copy(buf.begin(), buf.end(), sendBuffer[path].buffer.begin() + offset);
-            sendBuffer[path].dirty = true;
-            return (int) buf.size();
-        }
-        return 0;
+
+        std::copy(buf.begin(), buf.end(), inodes[path].buffer.begin() + offset);
+        inodes[path].dirty = true;
+        return (int) buf.size();
     }
 
     bool Arbiter::isDirty(const std::string &path) {
-        if (!existInBuffer(path)) { return false; }
-        return sendBuffer[path].dirty;
+        if (!exist(path)) { return false; }
+
+        return inodes[path].dirty;
     }
 
     bool Arbiter::flush() {
-        for (auto &pair: sendBuffer) {
+        for (auto &pair: inodes) {
             const auto &path = pair.first;
             auto &inode = pair.second;
             if (!inode.dirty) { continue; }
             for (const auto &nodeName: inode.nodeNames) {
                 auto fs = nodes[nodeName]->open(path, std::ios::out);
                 fs->write((char *) inode.buffer.data(), (int) inode.buffer.size());
+                inode.dirty = false;
+                inode.buffer.resize(0);
             }
         }
-        sendBuffer.clear();
         return true;
     }
 } // lifs
