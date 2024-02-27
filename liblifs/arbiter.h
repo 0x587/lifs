@@ -41,7 +41,7 @@ namespace lifs::arbiter {
         /*---------- file ----------*/
         bool exist(const std::string &path);
 
-        std::vector<NodeInfo> devStatus(const std::string &path);
+        std::vector<NodeInfo> nodeStatus(const std::string &path);
 
         bool create(const std::string &path);
 

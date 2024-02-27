@@ -37,7 +37,7 @@ namespace lifs::arbiter {
         return inodes.find(path) != inodes.end();
     }
 
-    std::vector<NodeInfo> Arbiter::devStatus(const std::string &path) {
+    std::vector<NodeInfo> Arbiter::nodeStatus(const std::string &path) {
         std::vector<NodeInfo> res;
 
         if (!exist(path)) { return res; }

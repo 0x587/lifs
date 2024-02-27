@@ -57,6 +57,10 @@ TEST(TestArbiter, TestIO) {
     EXPECT_EQ(arbiter.read("file1", buf, 0, (int) data.size()), data.size());
     EXPECT_EQ(buf, data);
 
+    std::vector<std::string> nodes{"dictionary1"};
+    EXPECT_EQ(arbiter.nodeStatus("file1").size(), 1);
+    EXPECT_EQ(arbiter.nodeStatus("file1")[0].name, "dictionary1");
+
     system("rm -rf TestIO1");
     system("rm -rf TestIO2");
 }
